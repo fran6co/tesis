@@ -10,6 +10,7 @@ import re
 import os
 import cgi
 import glob
+import hashlib
 
 class PVSResource(Resource):
     def __init__(self,id,theory,pvs):
@@ -115,9 +116,9 @@ class RootPVSResource(Resource):
         if isinstance(child, NoResource):
             session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/",name))
             if os.path.exists(session_path):
-                theories = map(lambda theory: os.path.basename(theory), glob.glob(os.path.join(session_path,'*')))
-                if len(theories) == 1:
-                    child = self.init_session(name, theories[0])
+                theory_path = glob.glob(os.path.join(session_path,'*.als'))[0]
+                theory = os.path.splitext(os.path.basename(theory_path))[0]
+                child = self.init_session(name, theory)
 
         return child
 
@@ -128,8 +129,16 @@ class RootPVSResource(Resource):
         return Resource.render(self,request)
 
     def render_GET(self, request):
-        sessions = glob.glob(os.path.join(os.path.dirname(__file__),"../data/*"))
-        sessions = map(lambda path: {'id': os.path.basename(path), 'theories': map(lambda theory: os.path.basename(theory), glob.glob(os.path.join(path,'*')))}, sessions)
+        sessions = []
+        sessions_path = glob.glob(os.path.join(os.path.dirname(__file__),"../data/*"))
+        for session in sessions_path:
+            theory_path = glob.glob(os.path.join(session,'*.als'))[0]
+            theory = os.path.splitext(os.path.basename(theory_path))[0]
+            hash = hashlib.md5(open(theory_path,'rb').read()).hexdigest()
+
+            id = os.path.basename(session)
+
+            sessions.append({'id': id, 'theory': theory, 'hash': hash})
 
         return json.dumps(sessions)
 
@@ -139,7 +148,7 @@ class RootPVSResource(Resource):
     def init_session(self, id, theory, file = None):
         log.msg("[%s] Intializing work environment" % (id))
 
-        session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/",id, theory))
+        session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/",id))
 
         dynamite_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/dynamite"))
         if not os.path.exists(session_path) or file:
@@ -147,7 +156,7 @@ class RootPVSResource(Resource):
 
             log.msg("[%s] Created path %s" % (id, session_path))
 
-            alloy_file = os.path.join(session_path, file.filename)
+            alloy_file = os.path.join(session_path, theory+'.als')
 
             out = open(alloy_file, 'wb')
             out.write(file.value)
