@@ -1,7 +1,7 @@
 #!/bin/sh
 # Release: PVSio-4.a (11/07/07)
 
-PVSPATH=/Volumes/Code/Code/pvc-server/lib/pvs
+PVSPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 #-------------------------------------------------
 # Nothing below this line should need modification

@@ -6,11 +6,12 @@ use Getopt::Long;
 use File::Basename;
 use Term::ANSIColor qw(:constants);
 use Cwd;
+use Cwd 'abs_path';
 
 $Term::ANSIColor::AUTORESET = 1;
 
 $OUTPUT_AUTOFLUSH=1;
-$PVSPATH="/Volumes/Code/Code/pvc-server/lib/pvs";
+$PVSPATH=abs_path(dirname(__FILE__));
 $VERSION="ProofLite-4.2 (01/10/10)";
 $PROVEIT="$PVSPATH/proveit";
 $PROVETHEMVERSION="provethem - $VERSION";

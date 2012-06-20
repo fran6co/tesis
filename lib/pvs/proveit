@@ -2,7 +2,7 @@
 # Script for batch proving in PVS 
 # Release: ProofLite-4.2 (01/10/10)
 
-PVSPATH=/Volumes/Code/Code/pvc-server/lib/pvs
+PVSPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 VERSION="ProofLite-4.2 (01/10/10)"
 
 export PROVEITVERSION="proveit - $VERSION"
