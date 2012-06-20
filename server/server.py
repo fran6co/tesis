@@ -9,6 +9,7 @@ import json
 import re
 import os
 import cgi
+import glob
 
 class PVSResource(Resource):
     def __init__(self,id,theory,pvs):
@@ -109,7 +110,16 @@ class RootPVSResource(Resource):
         if name == '':
             return self
 
-        return Resource.getChild(self, name, request)
+        child = Resource.getChild(self, name, request)
+
+        if isinstance(child, NoResource):
+            session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/",name))
+            if os.path.exists(session_path):
+                theories = map(lambda theory: os.path.basename(theory), glob.glob(os.path.join(session_path,'*')))
+                if len(theories) == 1:
+                    child = self.init_session(name, theories[0])
+
+        return child
 
     def render(self,request):
         request.setHeader('Access-Control-Allow-Origin', '*')
@@ -118,54 +128,37 @@ class RootPVSResource(Resource):
         return Resource.render(self,request)
 
     def render_GET(self, request):
-        for key in self.pvs.keys():
-            self.getChild(key, request)
+        sessions = glob.glob(os.path.join(os.path.dirname(__file__),"../data/*"))
+        sessions = map(lambda path: {'id': os.path.basename(path), 'theories': map(lambda theory: os.path.basename(theory), glob.glob(os.path.join(path,'*')))}, sessions)
 
-        #return json.dumps(map(lambda id: self.getChild(id, request).toDict(),self.pvs.keys()))
-        return json.dumps(map(lambda id: {'id':id},self.pvs.keys()))
+        return json.dumps(sessions)
 
     def render_OPTIONS(self,request):
         return ''
 
-    def render_POST(self,request):
-        id = str(uuid.uuid1())
-
+    def init_session(self, id, theory, file = None):
         log.msg("[%s] Intializing work environment" % (id))
 
-        headers = request.getAllHeaders()
-
-        data = cgi.FieldStorage(
-            fp = request.content,
-            headers = headers,
-            environ = {
-                'REQUEST_METHOD':'POST',
-                'CONTENT_TYPE': headers['content-type'],
-            }
-        )
-
-        session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/",id))
-        if not os.path.exists(session_path):
-            os.makedirs(session_path)
-
-        log.msg("[%s] Created path %s" % (id, session_path))
-
-        alloy_file = os.path.join(session_path,data["file"].filename)
-
-        out = open(alloy_file, 'wb')
-        out.write(data["file"].value)
-        out.close()
-
-        log.msg("[%s] Theory data file %s saved" % (id, alloy_file))
+        session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/",id, theory))
 
         dynamite_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/dynamite"))
+        if not os.path.exists(session_path) or file:
+            os.makedirs(session_path)
 
-        os.chdir(session_path)
-        os.system("/usr/bin/java -cp "+os.path.join(dynamite_path,'lib/dynamite-translator.jar')+":"+os.path.join(dynamite_path,'lib/alloy4.jar')+" ar.uba.dc.dynamite.api.SpecificationTranslatorRunner "+alloy_file)
+            log.msg("[%s] Created path %s" % (id, session_path))
 
-        log.msg("[%s] Translated alloy theory file to PVS" % (id))
+            alloy_file = os.path.join(session_path, file.filename)
 
-        data = json.loads(data['data'].value)
-        theory = data["theory"]
+            out = open(alloy_file, 'wb')
+            out.write(file.value)
+            out.close()
+
+            log.msg("[%s] Theory data file %s saved" % (id, alloy_file))
+
+            os.chdir(session_path)
+            os.system("/usr/bin/java -cp "+os.path.join(dynamite_path,'lib/dynamite-translator.jar')+":"+os.path.join(dynamite_path,'lib/alloy4.jar')+" ar.uba.dc.dynamite.api.SpecificationTranslatorRunner "+alloy_file)
+
+            log.msg("[%s] Translated alloy theory file to PVS" % (id))
 
         pvs = self.pvs[id] = pexpect.spawn(
             os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/pvs/pvsio")),
@@ -217,5 +210,26 @@ class RootPVSResource(Resource):
         resource = PVSResource(id,theory,pvs)
 
         self.putChild(id,resource)
+
+        return resource
+
+    def render_POST(self,request):
+        id = str(uuid.uuid1())
+
+        headers = request.getAllHeaders()
+
+        data = cgi.FieldStorage(
+            fp = request.content,
+            headers = headers,
+            environ = {
+                'REQUEST_METHOD':'POST',
+                'CONTENT_TYPE': headers['content-type'],
+                }
+        )
+
+        file = data["file"]
+        data = json.loads(data['data'].value)
+
+        resource = self.init_session(id, data["theory"], file)
 
         return resource.render_GET(request)
