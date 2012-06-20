@@ -1,0 +1,2 @@
+#!/bin/bash
+twistd -n web --resource-script=$PWD/server/server.rpy

@@ -1,0 +1,6 @@
+
+PDOCFARules: THEORY 
+ BEGIN
+	IMPORTING PDOCFADefinitions
+	OMEGA : AXIOM (FORALL (s: Carrier) : (FORALL (r: Carrier) :  (  ( Leq(one_prime,s) AND (FORALL (i: nat) :  ( Leq(generalizedComposition(r,i),s) IMPLIES Leq(generalizedComposition(r, ( i + 1 ) ),s) ) ) )  IMPLIES Leq(RTC(r),s) ) ))
+END PDOCFARules

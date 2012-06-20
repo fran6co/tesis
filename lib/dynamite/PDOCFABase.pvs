@@ -1,0 +1,6 @@
+
+PDOCFABase: THEORY 
+ BEGIN
+	Carrier: TYPE+
+
+END PDOCFABase

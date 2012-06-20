@@ -1,0 +1,15 @@
+#!/bin/sh
+
+JAVAPATH=/usr/bin
+export JAVAPATH
+
+DPSPATH=/Users/fran6co/Code/DynamiteProvingSystem
+export DPSPATH
+
+PVSPATH=/Users/fran6co/Code/pvs-5.0-ix86-MacOSX-allegro
+export PVSPATH
+
+ALLOYPATH=$DPSPATH/lib/alloy4.jar
+export ALLOYPATH
+
+$PVSPATH/pvs $* -load-after $DPSPATH/Starter/dps-starter.el -name Dynamite.proving.system 

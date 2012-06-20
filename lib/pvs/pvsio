@@ -1,0 +1,132 @@
+#!/bin/sh
+# Release: PVSio-4.a (11/07/07)
+
+PVSPATH=/Volumes/Code/Code/pvc-server/lib/pvs
+
+#-------------------------------------------------
+# Nothing below this line should need modification
+
+export PVSIOTCCS=nil
+export PVSIOVERB=nil
+export PVSIOTIME=nil
+export PVSIOVERSION="PVSio-4.a (11/07/07)"
+
+PACK=PVSio
+
+usage() {
+  echo "pvsio {<option>}* [<file>@]<theory>[:<main>]
+where <option> can be
+  -h|--help                print this message
+  -p|--packages P1,..,Pn   load packages P1,..,Pn
+  -t|--tccs                generate TCCs     
+  -T|--timing              print timing information for each evaluation
+  -v|--version             print PVSio version
+  -V|--verbose             print typechecking information
+  -l|--lisp                PVS lisp version [allegro,cmulisp,sbclisp]
+  <file>@<theory>:<main>   load <theory> from <file>.pvs, evaluate <main>, 
+                           and exit 
+
+  One letter options can be combined. If <file> is not provided,
+  <theory> is assumed to be the name of the file as well. If <main> is
+  not provided, PVSio starts a top level read-eval-loop.
+"  
+}
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+      -h|-help|--help)     
+	  usage
+	  exit 0;;
+      -l|-lisp|--lisp)    
+	  case $2 in
+	      allegro) PVSLISP='-lisp allegro';;
+	      cmulisp) PVSLISP='-lisp cmulisp';;
+	      sbclisp) PVSLISP='-lisp sbclisp';;
+	      *) echo "Only allegro, cmulisp, and sbclisp are currently available"
+		  exit 1;;
+	  esac
+	  shift;;
+      -p|-packages|--packages) 
+	  PACK="$PACK,$2"
+	  shift;;
+      -tccs|--tccs)        
+	  PVSIOTCCS=t;;
+      -timing|--timing) 
+	  PVSIOTIME=t;;
+      -verbose|--verbose)
+	  PVSIOVERB=t;;
+      -v|-version|--version)  
+	  echo $PVSIOVERSION
+	  exit 0;;
+      -*)           
+	  OPTS=`echo "$1" | sed -e s/-//g -e "s/\(.\)/\1 /g"`
+	  for opt in $OPTS
+	    do
+	    case $opt in
+		t)     
+		    PVSIOTCCS=t;;
+		T)   
+		    PVSIOTIME=t;;
+		V)   
+		    PVSIOVERB=t;;
+		*) 
+		    usage
+		    echo "Error: -$opt is not a valid option"
+		    exit 1;;
+	    esac
+	  done;;  
+      *)            
+	  ARG="$1"
+  esac
+  shift
+done
+
+PACK=`echo "(\"$PACK\")" | sed -e "s/,/\" \"/g"`
+
+if [ -z "$ARG" ] 
+then
+  echo "pvsio__ : THEORY BEGIN END pvsio__" > /tmp/pvsio__.pvs
+  ARG="/tmp/pvsio__"
+fi
+
+MAIN=
+
+case $ARG in
+  *@*) FILE=`echo $ARG | sed -e "s/\([^@]*\)@.*/\1/"`
+       THMA=`echo $ARG | sed -e "s/[^@]*@//"`;;
+  *:*) FILE=`echo $ARG | sed -e "s/\([^:]\):.*$/\1/"`
+       THMA=`echo $ARG | sed -e "s+.*/++"`;;
+  *)   FILE=$ARG
+       THMA=`echo $ARG | sed -e "s+.*/++"`;;
+esac
+
+case $THMA in
+  *:*) THEORY=`echo $THMA | sed -e "s/\([^:]\):.*$/\1/"`
+       MAIN=`echo $THMA | sed -e "s/[^:]*://"`;;
+  *)   THEORY=$THMA
+esac
+
+if [ -z "$FILE" ]
+then
+  echo Error: Invalid theory name $ARG
+  exit 0
+fi
+
+if [ -z "$THEORY" ]
+then
+  echo Error: Invalid theory name $ARG
+  exit 0
+fi
+
+if [ -z "$MAIN" ]
+then MAIN=nil
+else MAIN="\"$MAIN;\""
+fi
+
+export PVSIOFILE=$FILE
+export PVSIOTHEORY=$THEORY
+export PVSIOPACK=$PACK
+export PVSIOMAIN=$MAIN
+
+$PVSPATH/pvs -raw $PVSLISP -E "(run-pvsio)"
