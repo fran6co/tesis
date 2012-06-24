@@ -2,4 +2,4 @@ cache()
 
 from server import server
 
-resource = server.RootPVSResource()
+resource = server.RootPVCResource()

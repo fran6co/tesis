@@ -12,7 +12,7 @@ import cgi
 import glob
 import hashlib
 
-class PVSResource(Resource):
+class SessionPVCResource(Resource):
     def __init__(self,id,theory,pvs):
         self.pvs = pvs
         self.theory = theory
@@ -104,7 +104,7 @@ class PVSResource(Resource):
 
         return (antecedents,consequents)
 
-class RootPVSResource(Resource):
+class RootPVCResource(Resource):
     pvs = {}
 
     def getChild(self, name, request):
@@ -216,7 +216,7 @@ class RootPVSResource(Resource):
 
         log.msg("[%s] PVS Ready" % (id))
 
-        resource = PVSResource(id,theory,pvs)
+        resource = SessionPVCResource(id,theory,pvs)
 
         self.putChild(id,resource)
 
