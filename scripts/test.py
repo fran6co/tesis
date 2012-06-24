@@ -16,7 +16,12 @@ if not sessions:
 
     sessions = [json.loads(r.text)]
 
+print sessions
+
 for session in sessions:
-    payload = {'assertion': 'NoDirAliases'}
-    r = requests.get('http://localhost:8080/'+session['id']+'/assert',params={'data': json.dumps(payload)})
-    print r.text
+    r = requests.get('http://localhost:8080/'+session['id']+'/NoDirAliases')
+    print json.loads(r.text)
+
+    payload = {'command': 'skosimp*'}
+    r = requests.get('http://localhost:8080/'+session['id']+'/NoDirAliases/command',params={'data': json.dumps(payload)})
+    print json.loads(r.text)

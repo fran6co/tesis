@@ -12,14 +12,23 @@ import cgi
 import glob
 import hashlib
 
-class SessionPVCResource(Resource):
-    def __init__(self,id,theory,pvs):
+class TheoryPVCResource(Resource):
+    def __init__(self, session_id, theory, pvs):
+        self.name = theory
         self.pvs = pvs
-        self.theory = theory
-        self.id = id
+        self.session_id = session_id
         self.action = None
 
         Resource.__init__(self)
+
+    def render_GET(self,request):
+        return self._render(request,"GET")
+    def render_POST(self,request):
+        return self._render(request,"POST")
+    def render_PUT(self,request):
+        return self._render(request,"PUT")
+    def render_DELETE(self,request):
+        return self._render(request,"DELETE")
 
     def getChild(self, name, request):
         try:
@@ -34,15 +43,6 @@ class SessionPVCResource(Resource):
 
         return self
 
-    def render_GET(self,request):
-        return self._render(request,"GET")
-    def render_POST(self,request):
-        return self._render(request,"POST")
-    def render_PUT(self,request):
-        return self._render(request,"PUT")
-    def render_DELETE(self,request):
-        return self._render(request,"DELETE")
-
     def render_OPTIONS(self,request):
         return ''
 
@@ -52,39 +52,31 @@ class SessionPVCResource(Resource):
         request.setHeader("Access-Control-Allow-Headers","Content-Type,*")
         return Resource.render(self,request)
 
-    def toDict(self):
-        return {"id":self.id,"theory":self.theory}
-
     def _render(self, request,method):
         if self.action:
             func = getattr(self,self.action+'_'+method)
             return json.dumps(func(request))
         else:
-            return json.dumps(self.toDict())
+            statement = self.processResult(self.pvs.before)
 
-    def assert_GET(self,request):
-        data = json.loads(request.args['data'][0])
-
-        self.pvs.sendline("(prove \"%s\")!" % (data['assertion']))
-        self.pvs.expect("\nRule\? ")
-
-        statement = self.processResult(self.pvs.before)
-
-        return {'statement':statement}
+            return json.dumps({'statement':statement})
 
     def command_GET(self,request):
         data = json.loads(request.args['data'][0])
 
         command = data["command"]
-        parameters = map(lambda parameter: "\"%s\"" % (parameter) if isinstance(o, basestring) else parameter,data["parameters"])
+        try:
+            parameters = map(lambda parameter: "\"%s\"" % (parameter) if isinstance(o, basestring) else parameter, data["parameters"])
+        except KeyError:
+            parameters = []
 
-        log.msg("Running (%s %s)" % (command,' '.join(parameters)))
+        log.msg("[%s][%s] Running (%s %s)" % (self.session_id, self.name, command,' '.join(parameters)))
         self.pvs.sendline("(%s %s)" % (command,' '.join(parameters)))
         self.pvs.expect("\nRule\? ")
 
         result = self.processResult(self.pvs.before)
 
-        return {'result':result}
+        return json.dumps({'result':result})
 
     def processResult(self,result):
         pattern = re.compile('(?P<antecedents>(\s*[{|\[]-?\d+[}|\]]\s*.+\s*)*)\|-------(?P<consequents>(\s*[{|\[]-?\d+[}|\]]\s*.+\s*)*)')
@@ -94,15 +86,101 @@ class SessionPVCResource(Resource):
         antecedents = m.group('antecedents')
         consequents = m.group('consequents')
 
-        log.msg('Ant: '+antecedents)
-        log.msg('Cons: '+consequents)
-
         ents_pattern = re.compile('[{|\[]-?\d+[}|\]]\s*(.+)')
 
         antecedents = map(lambda s: s.strip(),ents_pattern.findall(antecedents))
         consequents = map(lambda s: s.strip(),ents_pattern.findall(consequents))
 
         return (antecedents,consequents)
+
+class SessionPVCResource(Resource):
+    def __init__(self,id,theory):
+        self.theory = theory
+        self.id = id
+
+        Resource.__init__(self)
+
+    def render(self,request):
+        request.setHeader('Access-Control-Allow-Origin', '*')
+        request.setHeader("Access-Control-Allow-Methods","*")
+        request.setHeader("Access-Control-Allow-Headers","Content-Type,*")
+
+        return Resource.render(self,request)
+
+    def render_GET(self, request):
+        theorems = []
+
+        for theorem in self.children:
+            theorems.append({'name': theorem.name})
+
+        return json.dumps(theorems)
+
+    def getChild(self, name, request):
+        if name == '':
+            return self
+
+        child = Resource.getChild(self, name, request)
+
+        if isinstance(child, NoResource):
+            session_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../data/", self.id))
+            dynamite_path = os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/dynamite"))
+
+            pvs = pexpect.spawn(
+                os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/pvs/pvsio")),
+                [os.path.join(session_path,"%sTheorems" % (self.theory))],
+                timeout=30)
+
+            log.msg("[%s] PVS channel open" % (self.id))
+
+            pvs.expect("\n<PVSio> ")
+
+            constants = '(progn\n'\
+                        + '(defconstant +dps-path+ "'+dynamite_path+'/")\n'\
+                        + '(defconstant +java+ "/usr/bin/java")\n'\
+                        + '(defconstant +alloy+ "'+os.path.join(dynamite_path,'lib/alloy4.jar')+'")\n'\
+                        + '(defconstant +alloy-entry-point+ "alloy.cli.AlloyCLI")\n'\
+                        + '(defconstant +dynamite-translator+ "'+os.path.join(dynamite_path,'lib/dynamite-translator.jar')+'")\n'\
+                        + '(defconstant +dynamite-translator-synthesized-expression-processor-entry-point+ "ar.uba.dc.dynamite.api.SynthesizedExpressionProcessor")\n'\
+                        + '(defconstant +dynamite-translator-synthesized-formula-processor-entry-point+ "ar.uba.dc.dynamite.api.SynthesizedFormulaProcessor")\n'\
+                        + '(defconstant +dynamite-translator-counterexample-vizualizator-entry-point+ "ar.uba.dc.dynamite.api.VizGUI")\n'\
+                        + '(defconstant +dynamite-translator-specification-processor-entry-point+ "ar.uba.dc.dynamite.api.SpecificationProcessor")\n'\
+                        + '(defconstant +dynamite-translator-synthesized-goal-processor-entry-point+ "ar.uba.dc.dynamite.api.SynthesizedGoalProcessor")\n'\
+                        + '(defconstant +dynamite-translator-postulator-entry-point+ "ar.uba.dc.dynamite.api.ExistencialCandidatePostulator")\n'\
+                        + '(defconstant +core-file-name+ "core")\n'\
+                        + '(defconstant +sugs-file-name+ "sugs")\n'\
+                        + '(defconstant +synthesized-goal-file-name+ "goal.als")\n'\
+                        + '(defvar *dps-pp-activated* t)\n'\
+            +')!'
+
+            pvs.sendline(constants)
+            pvs.expect("\n<PVSio> ")
+
+            log.msg("[%s] DPS constants initialized" % (self.id))
+
+            pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-intermediaries.lisp')+'"))!')
+            pvs.expect("\n<PVSio> ")
+
+            log.msg("[%s] DPS intermediaries loaded" % (self.id))
+
+            pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-userinterface.lisp')+'"))!')
+            pvs.expect("\n<PVSio> ")
+
+            log.msg("[%s] DPS user interface loaded" % (self.id))
+
+            pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-prover.lisp')+'"))!')
+            pvs.expect("\n<PVSio> ")
+
+            log.msg("[%s] PVS Ready" % (self.id))
+
+            pvs.sendline("(prove \"%s\")!" % (name))
+            pvs.expect("\nRule\? ")
+
+            log.msg("[%s] Proving %s assertion" % (self.id, name))
+
+            child = TheoryPVCResource(self.id, name, pvs)
+            self.putChild(name, child)
+
+        return child
 
 class RootPVCResource(Resource):
     def getChild(self, name, request):
@@ -167,54 +245,7 @@ class RootPVCResource(Resource):
 
             log.msg("[%s] Translated alloy theory file to PVS" % (id))
 
-        pvs = pexpect.spawn(
-            os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/pvs/pvsio")),
-            [os.path.join(session_path,"%sTheorems" % (theory))],
-            timeout=30)
-
-        log.msg("[%s] PVS channel open" % (id))
-
-        pvs.expect("\n<PVSio> ")
-
-        constants = '(progn\n'\
-                    + '(defconstant +dps-path+ "'+dynamite_path+'/")\n'\
-                    + '(defconstant +java+ "/usr/bin/java")\n'\
-                    + '(defconstant +alloy+ "'+os.path.join(dynamite_path,'lib/alloy4.jar')+'")\n'\
-                    + '(defconstant +alloy-entry-point+ "alloy.cli.AlloyCLI")\n'\
-                    + '(defconstant +dynamite-translator+ "'+os.path.join(dynamite_path,'lib/dynamite-translator.jar')+'")\n'\
-                    + '(defconstant +dynamite-translator-synthesized-expression-processor-entry-point+ "ar.uba.dc.dynamite.api.SynthesizedExpressionProcessor")\n'\
-                    + '(defconstant +dynamite-translator-synthesized-formula-processor-entry-point+ "ar.uba.dc.dynamite.api.SynthesizedFormulaProcessor")\n'\
-                    + '(defconstant +dynamite-translator-counterexample-vizualizator-entry-point+ "ar.uba.dc.dynamite.api.VizGUI")\n'\
-                    + '(defconstant +dynamite-translator-specification-processor-entry-point+ "ar.uba.dc.dynamite.api.SpecificationProcessor")\n'\
-                    + '(defconstant +dynamite-translator-synthesized-goal-processor-entry-point+ "ar.uba.dc.dynamite.api.SynthesizedGoalProcessor")\n'\
-                    + '(defconstant +dynamite-translator-postulator-entry-point+ "ar.uba.dc.dynamite.api.ExistencialCandidatePostulator")\n'\
-                    + '(defconstant +core-file-name+ "core")\n'\
-                    + '(defconstant +sugs-file-name+ "sugs")\n'\
-                    + '(defconstant +synthesized-goal-file-name+ "goal.als")\n'\
-                    + '(defvar *dps-pp-activated* t)\n'\
-        +')!'
-
-        pvs.sendline(constants)
-        pvs.expect("\n<PVSio> ")
-
-        log.msg("[%s] DPS constants initialized" % (id))
-
-        pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-intermediaries.lisp')+'"))!')
-        pvs.expect("\n<PVSio> ")
-
-        log.msg("[%s] DPS intermediaries loaded" % (id))
-
-        pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-userinterface.lisp')+'"))!')
-        pvs.expect("\n<PVSio> ")
-
-        log.msg("[%s] DPS user interface loaded" % (id))
-
-        pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-prover.lisp')+'"))!')
-        pvs.expect("\n<PVSio> ")
-
-        log.msg("[%s] PVS Ready" % (id))
-
-        resource = SessionPVCResource(id,theory,pvs)
+        resource = SessionPVCResource(id, theory)
 
         self.putChild(id,resource)
 
