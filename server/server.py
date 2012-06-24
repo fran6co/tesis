@@ -105,8 +105,6 @@ class SessionPVCResource(Resource):
         return (antecedents,consequents)
 
 class RootPVCResource(Resource):
-    pvs = {}
-
     def getChild(self, name, request):
         if name == '':
             return self
@@ -169,7 +167,7 @@ class RootPVCResource(Resource):
 
             log.msg("[%s] Translated alloy theory file to PVS" % (id))
 
-        pvs = self.pvs[id] = pexpect.spawn(
+        pvs = pexpect.spawn(
             os.path.normpath(os.path.join(os.path.dirname(__file__),"../lib/pvs/pvsio")),
             [os.path.join(session_path,"%sTheorems" % (theory))],
             timeout=30)
