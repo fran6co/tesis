@@ -16,16 +16,16 @@ alloy_file = open(os.path.join(tutorial_path, alloy_file_name), "rb")
 session = json.loads(
     requests.post(
         api_url,
-        headers = {'content-type': 'application/json'},
         data={'data':json.dumps({'theory': 'file_system'})},
         files={'file':(alloy_file_name, alloy_file)}
 ).text)
 
+print session
+
 # get all assertions for the theory
 assertions = json.loads(
     requests.get(
-        urlparse.urljoin(api_url, session['path'] + '/assertions'),
-        headers = {'content-type': 'application/json'}
+        urlparse.urljoin(api_url, session['path'] + '/assertions')
 ).text)
 
 print assertions
@@ -33,8 +33,7 @@ print assertions
 # starts proving the assertion NoDirAliases
 prove_session = json.loads(
     requests.put(
-        urlparse.urljoin(api_url, assertions['NoDirAliases']['path'] + '/prove'),
-        headers = {'content-type': 'application/json'}
+        urlparse.urljoin(api_url, assertions['NoDirAliases']['path'] + '/prove')
 ).text)
 
 print prove_session['goals']
@@ -45,8 +44,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'skosimp*'})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'skosimp*'})}
 ).text)
 
 print prove_session['goals']
@@ -57,8 +55,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'dps-case', 'parameters': ["oh_1 in Root"]})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'dps-case', 'parameters': ["oh_1 in Root"]})}
 ).text)
 
 print prove_session['goals']
@@ -68,8 +65,7 @@ goal = prove_session['goals'][0]
 # get all facts for the theory
 facts = json.loads(
     requests.get(
-        urlparse.urljoin(api_url, session['path'] + '/facts'),
-        headers = {'content-type': 'application/json'}
+        urlparse.urljoin(api_url, session['path'] + '/facts')
 ).text)
 
 print facts
@@ -78,8 +74,7 @@ print facts
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'use', 'parameters': ["RootHasNoParent"]})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'use', 'parameters': ["RootHasNoParent"]})}
 ).text)
 
 print prove_session['goals']
@@ -90,8 +85,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'use', 'parameters': ["ParentDefinition"]})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'use', 'parameters': ["ParentDefinition"]})}
 ).text)
 
 print prove_session['goals']
@@ -101,8 +95,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'dps-hyp', 'parameters': ["no ( (contents.oh_1) . Name) => no contents.oh_1"]})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'dps-hyp', 'parameters': ["no ( (contents.oh_1) . Name) => no contents.oh_1"]})}
 ).text)
 
 print prove_session['dps']['models_size']
@@ -115,8 +108,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'reduce'})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'reduce'})}
 ).text)
 
 print prove_session['goals']
@@ -126,8 +118,7 @@ goal = prove_session['goals'][0]
 # get all lemmas for the theory
 lemmas = json.loads(
     requests.get(
-        urlparse.urljoin(api_url, session['path'] + '/lemmas'),
-        headers = {'content-type': 'application/json'}
+        urlparse.urljoin(api_url, session['path'] + '/lemmas')
     ).text)
 
 print lemmas
@@ -138,8 +129,7 @@ goal = prove_session['goals'][1]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'use', 'parameters': ["Lemma1"]})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'use', 'parameters': ["Lemma1"]})}
 ).text)
 
 print prove_session['goals']
@@ -148,8 +138,7 @@ print prove_session['goals']
 goals = json.loads(
     requests.get(
         urlparse.urljoin(api_url, prove_session['path'] + '/goals'),
-        params={'filter': 'open'},
-        headers = {'content-type': 'application/json'}
+        params={'filter': 'open'}
 ).text)
 
 print goals
@@ -160,8 +149,7 @@ goal = goals['NoDirAliases.1.2']
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'typepred', 'parameters': ["oh_1"]})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'typepred', 'parameters': ["oh_1"]})}
 ).text)
 
 print prove_session['goals']
@@ -171,8 +159,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'prop'})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'prop'})}
 ).text)
 
 print prove_session['goals']
@@ -182,8 +169,7 @@ goal = goals['NoDirAliases.2']
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'use', 'parameters': ['OneParent']})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'use', 'parameters': ['OneParent']})}
 ).text)
 
 print prove_session['goals']
@@ -193,8 +179,7 @@ goal = prove_session['goals'][0]
 prove_session = json.loads(
     requests.put(
         urlparse.urljoin(api_url, goal['path'] + '/command'),
-        params={'data': json.dumps({'command': 'grind'})},
-        headers = {'content-type': 'application/json'}
+        params={'data': json.dumps({'command': 'grind'})}
 ).text)
 
 print prove_session['goals']
