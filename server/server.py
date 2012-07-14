@@ -59,14 +59,14 @@ class TheoryPVCResource(Resource):
         else:
             statement = self.processResult(self.pvs.before)
 
-            return json.dumps({'statement':statement})
+            return json.dumps({'path': '/'.join([self.session_id, self.name]), 'last_statement':statement})
 
     def command_GET(self,request):
         data = json.loads(request.args['data'][0])
 
         command = data["command"]
         try:
-            parameters = map(lambda parameter: "\"%s\"" % (parameter) if isinstance(o, basestring) else parameter, data["parameters"])
+            parameters = map(lambda parameter: "\"%s\"" % (parameter) if isinstance(parameter, basestring) else parameter, data["parameters"])
         except KeyError:
             parameters = []
 
@@ -74,9 +74,10 @@ class TheoryPVCResource(Resource):
         self.pvs.sendline("(%s %s)" % (command,' '.join(parameters)))
         self.pvs.expect("\nRule\? ")
 
+        log.msg("[%s][%s] Raw result:\n%s" % (self.session_id, self.name, self.pvs.before) )
         result = self.processResult(self.pvs.before)
 
-        return json.dumps({'result':result})
+        return json.dumps(result)
 
     def processResult(self,result):
         pattern = re.compile('(?P<antecedents>(\s*[{|\[]-?\d+[}|\]]\s*.+\s*)*)\|-------(?P<consequents>(\s*[{|\[]-?\d+[}|\]]\s*.+\s*)*)')
@@ -91,7 +92,7 @@ class TheoryPVCResource(Resource):
         antecedents = map(lambda s: s.strip(),ents_pattern.findall(antecedents))
         consequents = map(lambda s: s.strip(),ents_pattern.findall(consequents))
 
-        return (antecedents,consequents)
+        return {'antecedents': antecedents, 'consequents': consequents}
 
 class SessionPVCResource(Resource):
     def __init__(self,id,theory):
@@ -113,7 +114,7 @@ class SessionPVCResource(Resource):
         for theorem in self.children:
             theorems.append({'name': theorem.name})
 
-        return json.dumps(theorems)
+        return json.dumps({'id': self.id, 'path': self.id ,'theorems': json.dumps(theorems)})
 
     def getChild(self, name, request):
         if name == '':
