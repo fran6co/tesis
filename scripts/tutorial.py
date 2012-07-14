@@ -32,13 +32,13 @@ print assertions
 
 # starts proving the assertion NoDirAliases
 prove_session = json.loads(
-    requests.put(
-        urlparse.urljoin(api_url, assertions['NoDirAliases']['path'] + '/prove')
+    requests.post(
+        urlparse.urljoin(api_url, assertions['NoDirAliases']['path'] + '/session')
 ).text)
 
 print prove_session['goals']
 
-goal = prove_session['goals'][0]
+goal = prove_session['goals']['.0']
 
 # runs skosimp*
 prove_session = json.loads(
@@ -112,16 +112,6 @@ prove_session = json.loads(
 ).text)
 
 print prove_session['goals']
-
-goal = prove_session['goals'][0]
-
-# get all lemmas for the theory
-lemmas = json.loads(
-    requests.get(
-        urlparse.urljoin(api_url, session['path'] + '/lemmas')
-    ).text)
-
-print lemmas
 
 goal = prove_session['goals'][1]
 
