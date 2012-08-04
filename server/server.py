@@ -201,6 +201,9 @@ class ProveSession(Resource):
         pvs.sendline('(require (namestring "'+os.path.join(dynamite_path,'Starter/dps-prover.lisp')+'"))!')
         pvs.expect("\n<PVSio> ")
 
+        pvs.sendline('(setq *current-als-file-name* "'+self.session.theory+'")!')
+        pvs.expect("\n<PVSio> ")
+
         log.msg("[%s] PVS Ready" % (self.session.id))
 
         return pvs
