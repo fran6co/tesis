@@ -14,23 +14,22 @@ import hashlib
 
 
 class Goal(Resource):
-    def __init__(self, assertion, pvs_output, parent):
+    def __init__(self, assertion, pvs_output, session, parent):
         Resource.__init__(self)
 
         self.assertion = assertion
         self.parent = parent
         self.action = None
+        self.session = session
 
         self.parse_pvs(pvs_output)
+        self.id = str(id(self))
 
     def parse_pvs(self, pvs_output):
-        self.id = re.search('^'+self.assertion+'(?P<id>(\.\d)*) :', pvs_output, re.M).group('id')
-
-        if self.id == '':
-            self.id = '.0'
+        self.label = re.search('^(?P<id>'+self.assertion+'(\.\d)*) :', pvs_output, re.M).group('id')
 
     def path(self):
-        return self.parent.path() + '/' + self.id
+        return self.parent.path() + '/goals/' + self.id
 
     def render(self,request):
         request.setHeader('Access-Control-Allow-Origin', '*')
@@ -71,7 +70,7 @@ class Goal(Resource):
         else:
             return self.parent.render_GET(request)
 
-    def command_GET(self,request):
+    def command_PUT(self,request):
         data = json.loads(request.args['data'][0])
 
         command = data["command"]
@@ -80,14 +79,21 @@ class Goal(Resource):
         except KeyError:
             parameters = []
 
-        log.msg("[%s][%s] Running (%s %s)" % (self.session_id, self.name, command,' '.join(parameters)))
-        self.pvs.sendline("(%s %s)" % (command,' '.join(parameters)))
-        self.pvs.expect("\nRule\? ")
+        log.msg("[%s][%s] Running (%s %s)" % (self.session.id, self.assertion, command,' '.join(parameters)))
+        self.parent.pvs.sendline("(%s %s)" % (command,' '.join(parameters)))
+        self.parent.pvs.expect("\nRule\? ")
 
-        log.msg("[%s][%s] Raw result:\n%s" % (self.session_id, self.name, self.pvs.before) )
-        result = self.processResult(self.pvs.before)
+        log.msg("[%s][%s] Raw result:\n%s" % (self.session.id, self.assertion, self.parent.pvs.before) )
+        result = self.processResult(self.parent.pvs.before)
 
-        return json.dumps(result)
+        goal = Goal(self.assertion, self.parent.pvs.before, self.session, self.parent)
+        self.parent.goals[goal.id] = goal
+
+        goals = []
+
+        goals.append({'id': goal.id, 'path': goal.path()})
+
+        return {'path': self.path(), 'goals': goals}
 
     def processResult(self,result):
         pattern = re.compile('(?P<antecedents>(\s*[{|\[]-?\d+[}|\]]\s*.+\s*)*)\|-------(?P<consequents>(\s*[{|\[]-?\d+[}|\]]\s*.+\s*)*)')
@@ -125,10 +131,10 @@ class ProveSession(Resource):
         return Resource.render(self,request)
 
     def render_GET(self, request):
-        goals = {}
+        goals = []
 
         for id, goal in self.goals.iteritems():
-            goals[id] = {'path': goal.path()}
+            goals.append({'id': id, 'path': goal.path()})
 
         return json.dumps({'path': self.path(), 'goals': goals})
 
@@ -138,7 +144,7 @@ class ProveSession(Resource):
         self.pvs.sendline("(prove \"%s\")!" % (self.parent.name))
         self.pvs.expect("\nRule\? ")
 
-        goal = Goal(self.parent.name, self.pvs.before, self)
+        goal = Goal(self.parent.name, self.pvs.before, self.session, self)
 
         self.goals[goal.id] = goal
 
@@ -200,9 +206,8 @@ class ProveSession(Resource):
         return pvs
 
     def getChild(self, name, request):
-        self.request_path = None
-
         if name == '':
+            self.request_path = None
             return self
 
         if name == 'goals':
@@ -214,6 +219,8 @@ class ProveSession(Resource):
                 return self.goals[name]
             except KeyError:
                 return NoResource()
+
+        self.request_path = None
 
         return Resource.getChild(self, name, request)
 
